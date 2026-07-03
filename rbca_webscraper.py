@@ -6,6 +6,8 @@
 import requests
 import pandas as pd
 from datetime import datetime
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 #-----------------------------------------------------------------------------------------------------------
 # Webscraping
@@ -16,10 +18,19 @@ URL = (
 )
 
 headers = {
-    "User-Agent": "RBCA Register Downloader/1.0 (Sunain.Syed@communities.gov.uk)" # replace with long standing email for contact
+    "User-Agent": "RBCA Register Downloader/1.0 (Sunain.Syed@communities.gov.uk)" # replace with long standing email for contact from site admins
 }
 
-response = requests.get(URL, headers=headers, timeout=30)
+session = requests.Session()
+retries = Retry(
+    total=3,
+    backoff_factor=1,
+    status_forcelist=[429, 500, 502, 503, 504]
+)
+session.mount("https://", HTTPAdapter(max_retries=retries))
+session.headers.update(headers)
+
+response = session.get(URL, timeout=30)
 response.raise_for_status()
 data = response.json()
 
@@ -31,23 +42,26 @@ if "RBCAApplications" not in data:
 
 # Extract the company name, and registration number (RBCPxxxxxxxx)
 records = []
-for rbca in data["RBCAApplications"]:
+for rbca in data.get("RBCAApplications", []):
+    employer = rbca.get("Employer", {})
     records.append({
-        "Company": rbca["Employer"]["EmployerName"],
-        "Registration Number": rbca["Id"]
+        "Company": employer.get("EmployerName", "UNKNOWN"),
+        "Registration Number": rbca.get("Id", "UNKNOWN")
     })
 
 df = pd.DataFrame(records)
+df = df[["Registration Number", "Company"]]
 df = df.drop_duplicates(subset="Registration Number")
-df.sort_values("Company")
 df.reset_index(drop=True, inplace=True)
 print(df)
+print(f'Number of RBCAs = {len(df)}')
 
 #-----------------------------------------------------------------------------------------------------------
 # Save Data
 
 today = datetime.today().strftime("%Y-%m-%d")
 filename = f'RBCA_Register_{today}'
+
 # All RBCAs as of timestamp
 df.to_excel(filename + '.xlsx', index=False)
-df.to_csv(filename + '.csv', index=False) # csv for simpler processing if needed
+df.to_csv(filename + '.csv', index=False, encoding="utf-8-sig") # csv for simpler processing if needed
