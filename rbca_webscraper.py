@@ -5,7 +5,7 @@
 
 import requests
 import pandas as pd
-import json
+from datetime import datetime
 
 #-----------------------------------------------------------------------------------------------------------
 # Webscraping
@@ -26,6 +26,9 @@ data = response.json()
 if "RBCAApplications" not in data:
     raise ValueError("Unexpected API response format.")
 
+#-----------------------------------------------------------------------------------------------------------
+# Extract Data
+
 # Extract the company name, and registration number (RBCPxxxxxxxx)
 records = []
 for rbca in data["RBCAApplications"]:
@@ -35,9 +38,16 @@ for rbca in data["RBCAApplications"]:
     })
 
 df = pd.DataFrame(records)
+df = df.drop_duplicates(subset="Registration Number")
 df.sort_values("Company")
 df.reset_index(drop=True, inplace=True)
 print(df)
 
-# This produces the file of all RBCAs at the time it was ran
-df.to_csv("RBCA_Register.csv", index=False)
+#-----------------------------------------------------------------------------------------------------------
+# Save Data
+
+today = datetime.today().strftime("%Y-%m-%d")
+filename = f'RBCA_Register_{today}'
+# All RBCAs as of timestamp
+df.to_excel(filename + '.xlsx', index=False)
+df.to_csv(filename + '.csv', index=False) # csv for simpler processing if needed
