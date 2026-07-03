@@ -3,12 +3,16 @@
 #-----------------------------------------------------------------------------------------------------------
 # Imports
 
+import os
 import glob
 import requests
 import pandas as pd
 from datetime import datetime
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
+os.makedirs("snapshots", exist_ok=True)
+os.makedirs("diffs", exist_ok=True)
 
 #-----------------------------------------------------------------------------------------------------------
 # Webscraping
@@ -62,7 +66,7 @@ print(f'Number of RBCAs = {len(df)}')
 # Save Data
 
 today = datetime.today().strftime("%Y-%m-%d")
-filename = f'RBCA_Register_{today}'
+filename = f'snapshots/RBCA_Register_{today}'
 
 # All RBCAs as of timestamp
 df.to_excel(filename + '.xlsx', index=False)
@@ -74,8 +78,8 @@ df.to_csv(filename + '.csv', index=False, encoding="utf-8-sig") # csv for simple
 # USE df_raw for comparisons, NEVER use df for comparisons
 
 # Get data from .xlsx (Excel) files
-files = sorted(glob.glob("RBCA_Register_*.xlsx"))
-today_file = f"RBCA_Register_{today}.xlsx"
+files = sorted(glob.glob("snapshots/RBCA_Register_*.xlsx"))
+today_file = f"snapshots/RBCA_Register_{today}.xlsx"
 files = [f for f in files if not f.endswith(today_file)] # Exclude curr_file from list
 prev_file = files[-1] if files else None # Choose most recent snapshot (excluding current one)
 
@@ -104,6 +108,6 @@ diff_df = diff_df.sort_values(by="Company", key=lambda s: s.str.lower())
 diff_df.reset_index(drop=True, inplace=True)
 
 # Saving diff files
-diff_filename = f"RBCA_Diff_{today}"
+diff_filename = f"diffs/RBCA_Diff_{today}"
 diff_df.to_excel(diff_filename + ".xlsx", index=False)
 diff_df.to_csv(diff_filename + ".csv", index=False, encoding="utf-8-sig")
