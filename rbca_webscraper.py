@@ -3,43 +3,41 @@
 #-----------------------------------------------------------------------------------------------------------
 # Imports
 
-import time
 import requests
 import pandas as pd
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin
+import json
 
 #-----------------------------------------------------------------------------------------------------------
-# Webscrape
+# Webscraping
 
-BASE = "https://www.find-a-building-control-approver.service.gov.uk"
-LIST_URL = (
-    BASE +
-    "/public-register-england/results"
-    "?building-control-approver=&browse-all=true"
+URL = (
+    "https://www.find-a-building-control-approver.service.gov.uk"
+    "/api/GetRBCARegister?country=England"
 )
-HEADERS = {
-    "User-Agent":
-        "RBCA Register Downloader/1.0"
-        "(contact: your.email@example.com)"
+
+headers = {
+    "User-Agent": "RBCA Register Downloader/1.0 (Sunain.Syed@communities.gov.uk)" # replace with long standing email for contact
 }
 
-session = requests.Session()
-session.headers.update(HEADERS)
-
-response = session.get(LIST_URL, timeout=30)
+response = requests.get(URL, headers=headers, timeout=30)
 response.raise_for_status()
+data = response.json()
 
-soup = BeautifulSoup(response.text, "html.parser")
+if "RBCAApplications" not in data:
+    raise ValueError("Unexpected API response format.")
 
-links = []
-for a in soup.find_all("a", href=True):
-    href = a["href"]
-    if "/public-register-england/" in href and "results" not in href:
-        links.append(urljoin(BASE, href))
+# Extract the company name, and registration number (RBCPxxxxxxxx)
+records = []
+for rbca in data["RBCAApplications"]:
+    records.append({
+        "Company": rbca["Employer"]["EmployerName"],
+        "Registration Number": rbca["Id"]
+    })
 
-links = sorted(set(links))
-print(f"Found {len(links)} companies")
+df = pd.DataFrame(records)
+df.sort_values("Company")
+df.reset_index(drop=True, inplace=True)
+print(df)
 
-print(soup.prettify()[:5000])
-print("ACIVICO" in response.text)
+# This produces the file of all RBCAs at the time it was ran
+df.to_csv("RBCA_Register.csv", index=False)
